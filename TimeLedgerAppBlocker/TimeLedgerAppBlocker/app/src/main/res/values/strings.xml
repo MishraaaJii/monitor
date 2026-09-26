@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Time Ledger</string>
+
+    <!-- Main screen -->
+    <string name="empty_state">No apps found.</string>
+    <string name="no_limit">No limit set</string>
+    <string name="limit_format">Limit: %1$d min/day</string>
+    <string name="limit_off_format">Limit: %1$d min/day (off)</string>
+    <string name="usage_zero">0m today</string>
+    <string name="permissions_banner_text">Setup needed \u2014 tracking and blocking are off until permissions are granted</string>
+    <string name="permissions_banner_button">Fix</string>
+    <string name="menu_permissions">Permissions</string>
+
+    <!-- Set limit dialog -->
+    <string name="dialog_minutes_hint">Minutes per day</string>
+    <string name="dialog_save_limit">Save limit</string>
+    <string name="dialog_reset_today">Reset today\'s usage</string>
+    <string name="dialog_remove_limit">Remove limit</string>
+    <string name="dialog_close">Close</string>
+    <string name="toast_enter_valid_minutes">Enter a number of minutes greater than 0</string>
+    <string name="toast_limit_saved">Limit saved</string>
+    <string name="toast_limit_removed">Limit removed</string>
+    <string name="toast_usage_reset">Today\'s usage reset for this app</string>
+
+    <!-- Permissions screen -->
+    <string name="permissions_title">Permissions</string>
+    <string name="permissions_intro">Time Ledger needs two permissions to track app usage and enforce limits. Android requires you to grant these yourself in Settings \u2014 no app can turn these on for itself.</string>
+
+    <string name="perm_usage_title">Usage Access</string>
+    <string name="perm_usage_desc">Lets Time Ledger read how long each app has been used today, so it can show totals and know when a limit is reached.</string>
+    <string name="perm_usage_granted">Granted</string>
+    <string name="perm_usage_not_granted">Not granted</string>
+    <string name="perm_usage_button">Open Usage Access settings</string>
+
+    <string name="perm_accessibility_title">Accessibility Service</string>
+    <string name="perm_accessibility_desc">Lets Time Ledger notice the instant a limited app opens and send you back to the Home screen if today\'s limit for it has already been reached.</string>
+    <string name="perm_accessibility_granted">Enabled</string>
+    <string name="perm_accessibility_not_granted">Not enabled</string>
+    <string name="perm_accessibility_button">Open Accessibility settings</string>
+
+    <string name="perm_battery_title">Background reliability (optional)</string>
+    <string name="perm_battery_desc">Some phones aggressively kill background services to save battery, which can stop blocking from working. Exempting Time Ledger from battery optimization keeps it reliable.</string>
+    <string name="perm_battery_granted">Exempted</string>
+    <string name="perm_battery_not_granted">Not exempted</string>
+    <string name="perm_battery_button">Request exemption</string>
+
+    <string name="permissions_done">Done</string>
+
+    <string name="accessibility_service_description">Watches which app is currently in the foreground so Time Ledger can send you home when a daily app limit you set has been reached. Does not read screen content.</string>
+
+    <string name="limit_reached_toast">Daily limit reached for %1$s</string>
+</resources>
