@@ -28,29 +28,37 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     private var lastBlockedPackage: String? = null
     private var lastBlockedAt: Long = 0L
 
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        startGlobalPoll()
+    }
+
+    /** Always-on loop: checks whatever app is truly in the foreground, so
+     *  keyboards / system UI windows can no longer hide a limited app. */
+    private fun startGlobalPoll() {
+        pollRunnable?.let { handler.removeCallbacks(it) }
+        val r = object : Runnable {
+            override fun run() {
+                try {
+                    val fg = UsageStatsHelper.currentForegroundPackage(this@AppBlockerAccessibilityService)
+                    if (fg != null && fg != packageName) checkAndMaybeBlock(fg)
+                } catch (e: Exception) { /* keep polling */ }
+                handler.postDelayed(this, POLL_INTERVAL_MS)
+            }
+        }
+        pollRunnable = r
+        handler.post(r)
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return // ignore our own UI
-        if (pkg == currentPackage) return
-
+        if (pkg == "com.android.systemui") return
         currentPackage = pkg
-        checkAndMaybeBlock(pkg)
-        restartPolling(pkg)
-    }
-
-    private fun restartPolling(pkg: String) {
-        pollRunnable?.let { handler.removeCallbacks(it) }
-        val runnable = object : Runnable {
-            override fun run() {
-                checkAndMaybeBlock(pkg)
-                handler.postDelayed(this, POLL_INTERVAL_MS)
-            }
-        }
-        pollRunnable = runnable
-        handler.postDelayed(runnable, POLL_INTERVAL_MS)
+        checkAndMaybeBlock(pkg) // instant check when a limited app opens
     }
 
     private fun checkAndMaybeBlock(pkg: String) {
@@ -100,6 +108,6 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     companion object {
-        private const val POLL_INTERVAL_MS = 3000L
+        private const val POLL_INTERVAL_MS = 1000L
     }
 }

@@ -62,11 +62,11 @@ object UsageStatsHelper {
     }
 
     /**
-     * Foreground time in milliseconds, per package, for the window
-     * [sinceMillis, now]. Built from raw UsageEvents (foreground/background
-     * transitions) rather than queryUsageStats' daily buckets, since we need
-     * an accurate *partial* day and a window that can start mid-day after a
-     * manual per-app reset.
+     * Foreground time per package for [sinceMillis, now]. Android reports
+     * resume/pause per ACTIVITY, so an app with several activities emits
+     * overlapping events. We track the set of resumed activities per package
+     * and count time while that set is non-empty (fixes undercounting that
+     * kept limits from ever being reached).
      */
     fun computeUsageSince(context: Context, sinceMillis: Long): Map<String, Long> {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -74,65 +74,62 @@ object UsageStatsHelper {
         if (sinceMillis >= end) return emptyMap()
 
         val events = usm.queryEvents(sinceMillis, end)
-        val lastForegroundStart = HashMap<String, Long>()
+        val resumed = HashMap<String, MutableSet<String>>()
+        val since = HashMap<String, Long>()
         val totals = HashMap<String, Long>()
         val event = UsageEvents.Event()
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             val pkg = event.packageName ?: continue
+            val cls = event.className ?: ""
             when (event.eventType) {
                 UsageEvents.Event.MOVE_TO_FOREGROUND -> {
-                    lastForegroundStart[pkg] = event.timeStamp
+                    val set = resumed.getOrPut(pkg) { HashSet() }
+                    if (set.isEmpty()) since[pkg] = event.timeStamp
+                    set.add(cls)
                 }
                 UsageEvents.Event.MOVE_TO_BACKGROUND -> {
-                    val start = lastForegroundStart.remove(pkg)
-                    if (start != null && event.timeStamp > start) {
-                        totals[pkg] = (totals[pkg] ?: 0L) + (event.timeStamp - start)
+                    val set = resumed[pkg] ?: continue
+                    set.remove(cls)
+                    if (set.isEmpty()) {
+                        val st = since.remove(pkg)
+                        if (st != null && event.timeStamp > st) {
+                            totals[pkg] = (totals[pkg] ?: 0L) + (event.timeStamp - st)
+                        }
                     }
                 }
             }
         }
-        // Anything still "in foreground" at the end of the window (i.e. the
-        // app currently on screen) counts up to now.
-        for ((pkg, start) in lastForegroundStart) {
-            if (end > start) {
-                totals[pkg] = (totals[pkg] ?: 0L) + (end - start)
+        for ((pkg, st) in since) {
+            if (resumed[pkg]?.isNotEmpty() == true && end > st) {
+                totals[pkg] = (totals[pkg] ?: 0L) + (end - st)
             }
         }
         return totals
     }
 
-    /** Same as [computeUsageSince] but filtered to a single package (cheaper for polling). */
-    fun usageForPackageSince(context: Context, packageName: String, sinceMillis: Long): Long {
+    fun usageForPackageSince(context: Context, packageName: String, sinceMillis: Long): Long =
+        computeUsageSince(context, sinceMillis)[packageName] ?: 0L
+
+    /** Package of the app currently in the foreground, from recent usage events. */
+    fun currentForegroundPackage(context: Context): String? {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val end = System.currentTimeMillis()
-        if (sinceMillis >= end) return 0L
-
-        val events = usm.queryEvents(sinceMillis, end)
-        var lastStart: Long? = null
-        var total = 0L
+        val events = usm.queryEvents(end - 60 * 60_000L, end)
         val event = UsageEvents.Event()
-
+        val resumed = LinkedHashMap<String, String>() // cls -> pkg, in resume order
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            if (event.packageName != packageName) continue
+            val key = "${event.packageName}/${event.className}"
             when (event.eventType) {
-                UsageEvents.Event.MOVE_TO_FOREGROUND -> lastStart = event.timeStamp
-                UsageEvents.Event.MOVE_TO_BACKGROUND -> {
-                    val start = lastStart
-                    if (start != null && event.timeStamp > start) {
-                        total += (event.timeStamp - start)
-                    }
-                    lastStart = null
+                UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                    resumed.remove(key); resumed[key] = event.packageName ?: continue
                 }
+                UsageEvents.Event.MOVE_TO_BACKGROUND -> resumed.remove(key)
             }
         }
-        val start = lastStart
-        if (start != null && end > start) {
-            total += (end - start)
-        }
-        return total
+        return resumed.values.lastOrNull()
     }
 
     /** The effective start of the counting window for a package: the later of
